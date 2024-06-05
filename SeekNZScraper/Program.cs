@@ -17,11 +17,11 @@ namespace SeekNZScraper
             // Load the HTML from the URL
             string url = $"{domain}/{keyword}-jobs/in-{location}"; // Replace with your URL
             WebClient webClient = new WebClient(); //Deprecated
-            string html = webClient.DownloadString(url);
+            string mainHTMLJobQuery = webClient.DownloadString(url);
 
             // Parse the HTML using HtmlAgilityPack
             HtmlDocument doc = new HtmlDocument();
-            doc.LoadHtml(html);
+            doc.LoadHtml(mainHTMLJobQuery);
             int articleIndex = 0;
 
             // Find all article tags
@@ -41,6 +41,18 @@ namespace SeekNZScraper
                         string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
                         Console.WriteLine(_jobTitle);
                         Console.WriteLine(fullJobLink);
+
+                        WebClient _webClient = new WebClient(); //Deprecated
+                        string htmlJobPage = webClient.DownloadString(fullJobLink);
+
+                        // Parse the HTML using HtmlAgilityPack
+                        HtmlDocument _doc = new HtmlDocument();
+                        doc.LoadHtml(htmlJobPage);
+
+                        //foreach (HtmlNode? _article in doc.DocumentNode.SelectNodes("//article"))
+                        //{
+
+                        //}
                     }
                 }
                 articleIndex++;

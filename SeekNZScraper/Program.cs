@@ -21,7 +21,7 @@ namespace SeekNZScraper
             string keyword = "developer";
             string location = "auckland";
             string pageQuery = "?page=";
-            int startingPageQuery = 1;
+            int pageLimit = 50;
             // Load the HTML from the URL
             string url = $"{domain}/{keyword}-jobs/in-{location}{pageQuery}"; // Replace with your URL
 
@@ -29,7 +29,7 @@ namespace SeekNZScraper
             {
                 //Currently guess work as to how many pages.
                 //When there isn't a page available, it will not have an "<article>" but a "<section>" with value of "No matching search results"
-                for (int i = 25; i <= 28; i++)
+                for (int i = 1; i <= pageLimit; i++)
                 {
                     LoopThroughPage(url, i, domain, keywordsToLookOutFor);
                 }
@@ -39,6 +39,8 @@ namespace SeekNZScraper
                 Console.WriteLine("Stopping scraper...");
             }
 
+            //TODO
+            //Output data into PDF or Excel spread sheet?
             
             
         }

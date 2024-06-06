@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Xml.Linq;
 using HtmlAgilityPack;
+using SeekNZScraper.Models;
 
 namespace SeekNZScraper
 {
@@ -11,100 +12,171 @@ namespace SeekNZScraper
 
         static void Main(string[] args)
         {
+            List<ProgrammingLanguage> keywordsToLookOutFor = new List<ProgrammingLanguage>() {
+                new ProgrammingLanguage("React"),
+                new ProgrammingLanguage("C#")
+            };
+
             string domain = "https://seek.co.nz";
             string keyword = "developer";
             string location = "auckland";
+            string pageQuery = "?page=";
+            int startingPageQuery = 1;
             // Load the HTML from the URL
-            string url = $"{domain}/{keyword}-jobs/in-{location}"; // Replace with your URL
+            string url = $"{domain}/{keyword}-jobs/in-{location}{pageQuery}"; // Replace with your URL
+
+            try 
+            {
+                //Currently guess work as to how many pages.
+                //When there isn't a page available, it will not have an "<article>" but a "<section>" with value of "No matching search results"
+                for (int i = 25; i <= 28; i++)
+                {
+                    LoopThroughPage(url, i, domain, keywordsToLookOutFor);
+                }
+            }
+            catch(LoopBreakException)
+            {
+                Console.WriteLine("Stopping scraper...");
+            }
+
+            
+            
+        }
+
+        static bool HasKeywordBeenTriggered(string keyword, List<string> alreadyCountedKeywords)
+        {
+            foreach (var alreadyCountedKeyword in alreadyCountedKeywords)
+            {
+                if (keyword == alreadyCountedKeyword) return true;
+            }
+
+            return false;
+        }
+
+        static void LoopThroughPage(string url, int page, string domain, List<ProgrammingLanguage> keywordsToLookOutFor)
+        {
             WebClient webClient = new WebClient(); //Deprecated
-            string mainHTMLJobQuery = webClient.DownloadString(url);
+            string mainHTMLJobQuery = webClient.DownloadString(url + page);
+            Console.WriteLine($"Page: {page}");
 
             // Parse the HTML using HtmlAgilityPack
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(mainHTMLJobQuery);
             int articleIndex = 0;
 
-            // Find all article tags
-            foreach (HtmlNode? article in doc.DocumentNode.SelectNodes("//article"))
+            HtmlNodeCollection? articles = doc.DocumentNode.SelectNodes("//article");
+            if (articles == null)
             {
-                // Find all h2 tags inside the article tag
-                var jobTitles = article.SelectNodes(".//h3");
-
-                
-                // If there are any h3 tags, print out their text content
-                if (jobTitles != null)
+                HtmlNodeCollection sections = doc.DocumentNode.SelectNodes("//section");
+                if (sections.Count > 0)
                 {
-                    foreach (HtmlNode jobTitle in jobTitles)
+                    HtmlNodeCollection h3Nodes = doc.DocumentNode.SelectNodes(".//h3");
+                    if(h3Nodes.Count > 0)
                     {
-                        string _jobTitle = jobTitle.InnerText;
-                        HtmlNodeCollection? _jobLinkPostFix = jobTitle.SelectNodes(".//a");
-                        string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
-                        Console.WriteLine(_jobTitle);
-                        Console.WriteLine(fullJobLink);
-
-                        WebClient _webClient = new WebClient(); //Deprecated
-                        string htmlJobPage = webClient.DownloadString(fullJobLink);
-
-                        // Parse the HTML using HtmlAgilityPack
-                        HtmlDocument _doc = new HtmlDocument();
-                        doc.LoadHtml(htmlJobPage);
-
-                        //foreach (HtmlNode? _article in doc.DocumentNode.SelectNodes("//article"))
-                        //{
-
-                        //}
+                        foreach (var h3 in h3Nodes)
+                        {
+                            if (h3.InnerText.Contains("No matching"))
+                            {
+                                Console.WriteLine("No more pages. Exiting...");
+                                throw new LoopBreakException();
+                            }
+                            else
+                            {
+                                Console.Error.WriteLine("There is an h3, but may have changed their wording. Exiting...");
+                                throw new LoopBreakException();
+                            }
+                        }
+                    } 
+                    else
+                    {
+                        Console.Error.WriteLine("There are no articles, but there is a section, but no h3. Exiting...");
+                        throw new LoopBreakException();
                     }
                 }
-                articleIndex++;
-            }
+                else
+                {
+                    Console.Error.WriteLine("There are no articles or sections found on the page. Exiting...");
+                    throw new LoopBreakException();
+                }
+            } 
+            else
+            {
+                // Find all article tags
+                foreach (HtmlNode? article in articles)
+                {
+                    // Find all h2 tags inside the article tag
+                    var jobTitles = article.SelectNodes(".//h3");
 
-            Console.ReadLine();
-            /*
-                Outputs:
-                https://seek.co.nz/job/76371378?type=promoted&amp;ref=search-standalone&amp;origin=cardTitle
-                Full Stack Developer
-                https://seek.co.nz/job/76374214?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Junior Front End Developer
-                https://seek.co.nz/job/76373052?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Junior Software Developer
-                https://seek.co.nz/job/76335968?type=standard&amp;ref=search-standalone&amp;origin=cardTitle
-                Full Stack Software Developer
-                https://seek.co.nz/job/76183228?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Intermediate Swift Developer (Contract)
-                https://seek.co.nz/job/76371832?type=standard&amp;ref=search-standalone&amp;origin=cardTitle
-                WordPress Developer/ Designer
-                https://seek.co.nz/job/76378821?type=standard&amp;ref=search-standalone&amp;origin=cardTitle
-                Software Developer
-                https://seek.co.nz/job/76215739?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Intermediate Full Stack Developer
-                https://seek.co.nz/job/76296969?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Fullstack Developer (Node &amp; React)
-                https://seek.co.nz/job/76389005?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Junior Developer
-                https://seek.co.nz/job/75993807?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Front End Web Developer, Fashion &amp; Homewares Brand
-                https://seek.co.nz/job/76231343?type=standard&amp;ref=search-standalone&amp;origin=cardTitle
-                Senior Full Stack Developer
-                https://seek.co.nz/job/76371378?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                React Full Stack Developer
-                https://seek.co.nz/job/76239523?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Full Stack Web Developer
-                https://seek.co.nz/job/76223506?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Seeking Savvy Backend Developer
-                https://seek.co.nz/job/76207866?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Fullstack Developer (&gt;= intermediate)
-                https://seek.co.nz/job/76154462?type=standard&amp;ref=search-standalone&amp;origin=cardTitle
-                Software Engineer
-                https://seek.co.nz/job/76279249?type=standard&amp;ref=search-standalone&amp;origin=cardTitle
-                Front End Developer
-                https://seek.co.nz/job/76101126?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Senior Software Developer (C++)
-                https://seek.co.nz/job/76366838?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-                Senior Full Stack Developer - React
-                https://seek.co.nz/job/76365641?type=standout&amp;ref=search-standalone&amp;origin=cardTitle
-             */
+
+                    // If there are any h3 tags, print out their text content
+                    if (jobTitles != null)
+                    {
+                        foreach (HtmlNode jobTitle in jobTitles)
+                        {
+                            string _jobTitle = jobTitle.InnerText;
+                            HtmlNodeCollection? _jobLinkPostFix = jobTitle.SelectNodes(".//a");
+                            string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
+                            Console.WriteLine(_jobTitle);
+                            Console.WriteLine($"Page Link: {fullJobLink}");
+
+                            WebClient _webClient = new WebClient(); //Deprecated
+                            string htmlJobPage = webClient.DownloadString(fullJobLink);
+
+                            // Parse the HTML using HtmlAgilityPack
+                            HtmlDocument _doc = new HtmlDocument();
+                            _doc.LoadHtml(htmlJobPage);
+
+
+                            foreach (HtmlNode? _section in _doc.DocumentNode.SelectNodes("//section"))
+                            {
+                                List<string> alreadyCountedKeywords = new List<string>();
+                                HtmlNodeCollection? unorderedLists = _section.SelectNodes(".//ul");
+                                if (unorderedLists != null)
+                                {
+                                    foreach (HtmlNode? _ul in unorderedLists)
+                                    {
+                                        HtmlNodeCollection? _lis = _ul.SelectNodes(".//li");
+                                        foreach (HtmlNode? _li in _lis)
+                                        {
+                                            List<string> keywordsToAdd = new List<string>();
+                                            if (_li != null)
+                                            {
+                                                foreach (var _keyword in keywordsToLookOutFor)
+                                                {
+                                                    if (_li.InnerText.Contains(_keyword.Name))
+                                                    {
+                                                        if (alreadyCountedKeywords.Count > 0)
+                                                        {
+                                                            if (!HasKeywordBeenTriggered(_keyword.Name, alreadyCountedKeywords))
+                                                            {
+                                                                _keyword.IncrementCount();
+                                                                Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
+                                                                keywordsToAdd.Add(_keyword.Name);
+                                                            }
+                                                            alreadyCountedKeywords.AddRange(keywordsToAdd);
+                                                            keywordsToAdd.Clear();
+                                                        }
+                                                        else
+                                                        {
+                                                            _keyword.IncrementCount();
+                                                            Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
+                                                            alreadyCountedKeywords.Add(_keyword.Name);
+                                                        }
+
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                    }
+                                }
+                                alreadyCountedKeywords.Clear();
+                            }
+                        }
+                    }
+                    articleIndex++;
+                }
+            }            
         }
-
-
     }
 }

@@ -56,16 +56,6 @@ namespace SeekNZScraper
             DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
         }
 
-        private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)
-        {
-            Console.ForegroundColor = color;
-            Console.WriteLine(message);
-            Console.ResetColor();
-        }
-
-        
-
-        
 
         private static List<string> ScrapeJobPages(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit)
         {
@@ -183,7 +173,6 @@ namespace SeekNZScraper
             HtmlDocument _doc = new HtmlDocument();
             _doc.LoadHtml(htmlJobPage);
 
-
             foreach (HtmlNode? _section in _doc.DocumentNode.SelectNodes("//section"))
             {
                 HtmlNodeCollection? unorderedLists = _section.SelectNodes(".//ul");
@@ -245,5 +234,13 @@ namespace SeekNZScraper
                 ConsoleWriteWithColour(compiledString, ConsoleColor.Cyan);
             }
         }
+
+        private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)
+        {
+            Console.ForegroundColor = color;
+            Console.WriteLine(message);
+            Console.ResetColor();
+        }
+
     }
 }

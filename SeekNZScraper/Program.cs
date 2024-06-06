@@ -12,16 +12,69 @@ namespace SeekNZScraper
 
         static void Main(string[] args)
         {
-            List<ProgrammingLanguage> keywordsToLookOutFor = new List<ProgrammingLanguage>() {
-                new ProgrammingLanguage("React"),
-                new ProgrammingLanguage("C#")
+
+
+
+            List<Keyword> keywordsToLookOutFor = new List<Keyword>() {
+                new Keyword("C#"),
+                new Keyword("C++"),
+                new Keyword("Cpp"),
+                new Keyword("Node"),
+                new Keyword("NextJS"),
+                new Keyword("NuxtJS"),
+                new Keyword("Flutter"),
+                new Keyword("Python"),
+                new Keyword("HTML"),
+                new Keyword("CSS"),
+                new Keyword("SASS"),
+                new Keyword("BootStrap"),
+                new Keyword("TailwindCSS"),
+                new Keyword("JavaScript"),
+                new Keyword("TypeScript"),
+                new Keyword("jQuery"),
+                new Keyword("React"),
+                new Keyword("React Native"),
+                new Keyword("Vue"),
+                new Keyword("Angular"),
+                new Keyword("RxJS"),
+                new Keyword("Ruby"),
+                new Keyword("Docker"),
+                new Keyword("Kubernetes"),
+                new Keyword("Azure"),
+                new Keyword("Google Cloud"),
+                new Keyword("AWS"),
+                new Keyword("Microservices"),
+                new Keyword("MariaDB"),
+                new Keyword("SQL"),
+                new Keyword("PostgreSQL"),
+                new Keyword("MySQL"),
+                new Keyword("T-SQL"),
+                new Keyword("Mongo"),
+                new Keyword("GoLang"),
+                new Keyword("Java"),
+                new Keyword("Springboot"),
+                new Keyword(".NET"),
+                new Keyword("MVC.NET"),
+                new Keyword("C3.NET"),
+                new Keyword("ASP.NET"),
+                new Keyword("Entity Framework"),
+                new Keyword("Signal R"),
+                new Keyword("PHP"),
+                new Keyword("RESTFUL"),
+                new Keyword("GraphQL"),
+                new Keyword("Git"),
+                new Keyword("Cypress"),
+                new Keyword("RabbitMQ"),
+                new Keyword("CI/CD"),
             };
+
 
             string domain = "https://seek.co.nz";
             string keyword = "developer";
             string location = "auckland";
             string pageQuery = "?page=";
             int pageLimit = 50;
+            int highlightKeywordsGreaterThanCount = 10;
             // Load the HTML from the URL
             string url = $"{domain}/{keyword}-jobs/in-{location}{pageQuery}"; // Replace with your URL
 
@@ -38,10 +91,37 @@ namespace SeekNZScraper
             {
                 Console.WriteLine("Stopping scraper...");
             }
+            finally
+            {
+                //TODO
+                //Output data into PDF or Excel spread sheet?
+                Console.WriteLine("---- Now displaying a summary ----");
+                foreach (var _keyword in keywordsToLookOutFor)
+                {
+                    if (_keyword.Count > highlightKeywordsGreaterThanCount)
+                    {
+                        Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
+                    }
+                }
 
-            //TODO
-            //Output data into PDF or Excel spread sheet?
-            
+                int maxLength = keywordsToLookOutFor.Max(k => k.Name.Length);
+
+                Console.WriteLine("---- Now displaying a summary ----");
+                foreach (var _keyword in keywordsToLookOutFor)
+                {
+                    string compiledString = $"{_keyword.Name.PadRight(maxLength)}: ";
+                    for (int i = 0; i < _keyword.Count; i++)
+                    {
+                        compiledString += i % 5 == 0 && i != 0 ? "|" : "-";
+                    }
+                    Console.WriteLine(compiledString);
+                }
+            }
+
             
         }
 
@@ -55,7 +135,7 @@ namespace SeekNZScraper
             return false;
         }
 
-        static void LoopThroughPage(string url, int page, string domain, List<ProgrammingLanguage> keywordsToLookOutFor)
+        static void LoopThroughPage(string url, int page, string domain, List<Keyword> keywordsToLookOutFor)
         {
             WebClient webClient = new WebClient(); //Deprecated
             string mainHTMLJobQuery = webClient.DownloadString(url + page);
@@ -77,7 +157,7 @@ namespace SeekNZScraper
                     {
                         foreach (var h3 in h3Nodes)
                         {
-                            if (h3.InnerText.Contains("No matching"))
+                            if (h3.InnerText.Contains("No matching", StringComparison.OrdinalIgnoreCase))
                             {
                                 Console.WriteLine("No more pages. Exiting...");
                                 throw new LoopBreakException();
@@ -145,26 +225,13 @@ namespace SeekNZScraper
                                             {
                                                 foreach (var _keyword in keywordsToLookOutFor)
                                                 {
-                                                    if (_li.InnerText.Contains(_keyword.Name))
+                                                    if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
                                                     {
-                                                        if (alreadyCountedKeywords.Count > 0)
+                                                        if (!_keyword.urls.Contains(htmlJobPage))
                                                         {
-                                                            if (!HasKeywordBeenTriggered(_keyword.Name, alreadyCountedKeywords))
-                                                            {
-                                                                _keyword.IncrementCount();
-                                                                Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
-                                                                keywordsToAdd.Add(_keyword.Name);
-                                                            }
-                                                            alreadyCountedKeywords.AddRange(keywordsToAdd);
-                                                            keywordsToAdd.Clear();
-                                                        }
-                                                        else
-                                                        {
+                                                            _keyword.urls.Add(htmlJobPage);
                                                             _keyword.IncrementCount();
-                                                            Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
-                                                            alreadyCountedKeywords.Add(_keyword.Name);
                                                         }
-
                                                     }
                                                 }
                                             }

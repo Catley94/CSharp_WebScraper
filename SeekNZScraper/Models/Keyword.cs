@@ -6,12 +6,14 @@ using System.Threading.Tasks;
 
 namespace SeekNZScraper.Models
 {
-    public record ProgrammingLanguage
+    public record Keyword
     {
         public string Name { get; }
         public int Count { get; private set; }
 
-        public ProgrammingLanguage(string _Name) 
+        public List<string> urls = new List<string>();
+
+        public Keyword(string _Name) 
         {
             Name = _Name;
         }

@@ -5,6 +5,8 @@
 
 This is a simple web scraper specifically made for Seek.co.nz, using the role as "Developer" in "Auckland", however both the role and location are changable in code.
 
+It was made specifically to keep track of the tech being used in NZ so I can make sure my skills are appealing to them when it's our time to move over there.
+
 It will initally scrape the each page with the job listings, going into each job posting, scraping that page and looking specifically for keywords defined in "Keywords.cs".
 
 If it finds any keywords, it adds the job listing URL to that keyword, and makes sure that if that same keyword has been mentioned twice in the page, that it will not count a second for the same keyword.

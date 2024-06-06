@@ -22,7 +22,7 @@ namespace SeekNZScraper
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 1;
+            int pageLimit = 50;
             int highlightKeywordsGreaterThanCount = 10;
 
             if (File.Exists(filePath))
@@ -30,13 +30,15 @@ namespace SeekNZScraper
                 // Load the list from the file
                 string json = File.ReadAllText(filePath);
                 htmlJobPages = JsonSerializer.Deserialize<List<string>>(json);
-                Console.WriteLine("Loaded job pages from file.");
+                ConsoleWriteWithColour("Loaded job pages from file.", ConsoleColor.Green);
             }
             else
             {
+                
+                ConsoleWriteWithColour("Scraping pages.", ConsoleColor.Blue);
                 // Scrape the website to populate the list
                 htmlJobPages = ScrapeJobPages(keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit);
-                Console.WriteLine("Scraped all job pages from the website.");
+                ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
 
                 // Save the list to the file
                 string json = JsonSerializer.Serialize(htmlJobPages);
@@ -52,6 +54,13 @@ namespace SeekNZScraper
             }
 
             DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
+        }
+
+        private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)
+        {
+            Console.ForegroundColor = color;
+            Console.WriteLine(message);
+            Console.ResetColor();
         }
 
         
@@ -80,7 +89,7 @@ namespace SeekNZScraper
                 //When there isn't a page available, it will not have an "<article>" but a "<section>" with value of "No matching search results"
                 for (int pageNum = 1; pageNum <= pageLimit; pageNum++)
                 {
-                    Console.WriteLine($"Page: {pageNum}");
+                    ConsoleWriteWithColour($"Page: {pageNum}", ConsoleColor.Yellow);
 
                     WebClient webClient = new WebClient(); //Deprecated
                                                            //+ page number: https://seek.co.nz/developer-jobs/in-auckland?page=1
@@ -105,7 +114,7 @@ namespace SeekNZScraper
                                 {
                                     if (h3.InnerText.Contains("No matching", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        Console.WriteLine("No more pages. Exiting...");
+                                        ConsoleWriteWithColour("No more pages. Exiting...", ConsoleColor.Blue);
                                         throw new LoopBreakException();
                                     }
                                     else
@@ -145,8 +154,9 @@ namespace SeekNZScraper
                                     string _jobTitle = jobTitle.InnerText;
                                     HtmlNodeCollection? _jobLinkPostFix = jobTitle.SelectNodes(".//a");
                                     string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
-                                    Console.WriteLine(_jobTitle);
-                                    Console.WriteLine($"Page Link: {fullJobLink}");
+
+                                    ConsoleWriteWithColour(_jobTitle, ConsoleColor.Green);
+                                    ConsoleWriteWithColour($"Page Link: {fullJobLink}", ConsoleColor.Green);
 
                                     WebClient _webClient = new WebClient(); //Deprecated
                                     string htmlJobPage = webClient.DownloadString(fullJobLink);
@@ -160,7 +170,7 @@ namespace SeekNZScraper
             }
             catch (LoopBreakException)
             {
-                Console.WriteLine("Stopping scraper...");
+                ConsoleWriteWithColour("Stopping scraper...", ConsoleColor.Red);
             }
             
             return individualJobPages;
@@ -208,9 +218,8 @@ namespace SeekNZScraper
 
         private static void DisplayScrapingResults(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount)
         {
-            //TODO
-            //Output data into PDF or Excel spread sheet?
-            Console.WriteLine("---- Now displaying a summary ----");
+           
+            ConsoleWriteWithColour("---- Now displaying a summary ----");
             foreach (var _keyword in keywordsToLookOutFor)
             {
                 if (_keyword.Count > highlightKeywordsGreaterThanCount)
@@ -225,7 +234,7 @@ namespace SeekNZScraper
 
             int maxLength = keywordsToLookOutFor.Max(k => k.Name.Length);
 
-            Console.WriteLine("---- Now displaying a summary ----");
+            ConsoleWriteWithColour("---- Now displaying a summary ----", ConsoleColor.Green);
             foreach (var _keyword in keywordsToLookOutFor)
             {
                 string compiledString = $"{_keyword.Name.PadRight(maxLength)}: ";
@@ -233,7 +242,7 @@ namespace SeekNZScraper
                 {
                     compiledString += i % 5 == 0 && i != 0 ? "|" : "-";
                 }
-                Console.WriteLine(compiledString);
+                ConsoleWriteWithColour(compiledString, ConsoleColor.Cyan);
             }
         }
     }

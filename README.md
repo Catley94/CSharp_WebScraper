@@ -20,3 +20,5 @@ it already checks if there are any job postings on that page, if not, the it ass
 As a summary, it displays a tally graph to easily see which is more popular, and there is also a graph above with actual numbers.
 
 As mentioned above, this is not meant to be a malicious program which is heavy on traffic, if Seek.co.nz approach me about this project and request me to make this a private repo, or take it down, I will do so. 
+
+There is room to add more than one job site hear, though FYI from my experience of scraping, each website can be different, so the logic of scraping that page will be unqiue, perhaps something a switch/case statement would be useful for. 

@@ -229,7 +229,7 @@ namespace SeekNZScraper
                 string compiledString = $"{_keyword.Name.PadRight(maxLength)}: ";
                 for (int i = 0; i < _keyword.Count; i++)
                 {
-                    compiledString += i % 5 == 0 && i != 0 ? "|" : "-";
+                    compiledString += i > 0 && (i + 1) % 5 == 0 ? "|" : "-";
                 }
                 ConsoleWriteWithColour(compiledString, ConsoleColor.Cyan);
             }

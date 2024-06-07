@@ -173,7 +173,7 @@ namespace SeekNZScraper
                                     HtmlNodeCollection? _jobLinkPostFix = jobTitle.SelectNodes(".//a");
                                     string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
 
-                                    ConsoleWriteWithColour(_jobTitle, ConsoleColor.Green);
+                                    ConsoleWriteWithColour(_jobTitle, ConsoleColor.Cyan);
                                     ConsoleWriteWithColour($"Page Link: {fullJobLink}", ConsoleColor.Green);
 
                                     WebClient _webClient = new WebClient(); //Deprecated

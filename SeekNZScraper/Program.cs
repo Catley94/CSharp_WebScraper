@@ -218,19 +218,6 @@ namespace SeekNZScraper
                 if(_keyword.Count > 0) keywords.Add(_keyword);
             }
 
-            ConsoleWriteWithColour("---- Now displaying a summary ----");
-            foreach (var _keyword in keywords)
-            {
-                if (_keyword.Count > highlightKeywordsGreaterThanCount)
-                {
-                    Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
-                }
-                else
-                {
-                    Console.WriteLine($"{_keyword.Name}: {_keyword.Count}");
-                }
-            }
-
             int maxLength = keywordsToLookOutFor.Max(k => k.Name.Length);
 
             ConsoleWriteWithColour("---- Now displaying a summary ----", ConsoleColor.Green);
@@ -241,6 +228,7 @@ namespace SeekNZScraper
                 for (int i = 0; i < _keyword.Count; i++)
                 {
                     compiledString += i > 0 && (i + 1) % 5 == 0 ? "|" : "-";
+                    if (i == _keyword.Count - 1) compiledString += $" " + _keyword.Count;
                 }
                 ConsoleWriteWithColour(compiledString, ConsoleColor.Cyan);
             }

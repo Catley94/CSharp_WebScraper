@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using System.Xml.Linq;
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml.Spreadsheet;
 using HtmlAgilityPack;
 using SeekNZScraper.Data;
 using SeekNZScraper.Models;
@@ -18,14 +19,16 @@ namespace SeekNZScraper
         {
 
             //Offline use
-            string filePath = "jobPages.json";
+            DateTime date = DateTime.Now.Date;
+            string filePath = $"jobPages-{date.ToString("dd-MM-yyyy-HH-mm-ss")}.json";
+
             JsonSaveData? saveData;
             List<string> htmlJobPages = new List<string>();
             List<string> urls = new List<string>();
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 1;
+            int pageLimit = 50;
             int highlightKeywordsGreaterThanCount = 10;
 
             if (File.Exists(filePath))
@@ -265,7 +268,10 @@ namespace SeekNZScraper
 
         static void GenerateExcelFile(List<string> jobPages, List<Keyword> keywordsToLookOutFor)
         {
-            string excelFilePath = "JobPages.xlsx";
+            DateTime date = DateTime.Now.Date;
+
+
+            string excelFilePath = $"JobPages-{date.ToString("dd-MM-yyyy-HH-mm-ss")}.xlsx";
 
             using (var workbook = new XLWorkbook())
             {

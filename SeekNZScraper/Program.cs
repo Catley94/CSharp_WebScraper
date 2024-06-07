@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Text.Json;
 using System.Xml.Linq;
+using ClosedXML.Excel;
 using HtmlAgilityPack;
 using SeekNZScraper.Data;
 using SeekNZScraper.Models;
@@ -18,18 +19,29 @@ namespace SeekNZScraper
 
             //Offline use
             string filePath = "jobPages.json";
-            List<string> htmlJobPages;
+            JsonSaveData? saveData;
+            List<string> htmlJobPages = new List<string>();
+            List<string> urls = new List<string>();
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 50;
+            int pageLimit = 1;
             int highlightKeywordsGreaterThanCount = 10;
 
             if (File.Exists(filePath))
             {
                 // Load the list from the file
                 string json = File.ReadAllText(filePath);
-                htmlJobPages = JsonSerializer.Deserialize<List<string>>(json);
+                JsonSerializerOptions options = new JsonSerializerOptions
+                {
+                    IncludeFields = true
+                };
+                saveData = JsonSerializer.Deserialize<JsonSaveData>(json, options);
+                if(saveData != null)
+                {
+                    htmlJobPages = saveData.HtmlStrings;
+                    urls = saveData.Urls;
+                }
                 ConsoleWriteWithColour("Loaded job pages from file.", ConsoleColor.Green);
             }
             else
@@ -37,31 +49,44 @@ namespace SeekNZScraper
                 
                 ConsoleWriteWithColour("Scraping pages.", ConsoleColor.Blue);
                 // Scrape the website to populate the list
-                htmlJobPages = ScrapeJobPages(keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit);
+                htmlJobPages = ScrapeJobPages(keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
                 ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
 
-                // Save the list to the file
-                string json = JsonSerializer.Serialize(htmlJobPages);
-                File.WriteAllText(filePath, json);
+                saveData = new JsonSaveData(htmlJobPages, urls);
+
+                try 
+                {
+                    // Save the list to the file
+                    string json = JsonSerializer.Serialize(saveData, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(filePath, json);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Serialization failed: {ex.Message}");
+                }
+                
             }
 
             if (htmlJobPages != null)
             {
-                foreach (var htmlJobPage in htmlJobPages)
+                for (short i = 0; i < htmlJobPages.Count - 1; i++)
                 {
-                    ScrapeIndividualJobPage(htmlJobPage, keywordsToLookOutFor);
+                    ScrapeIndividualJobPage(htmlJobPages[i], keywordsToLookOutFor, urls[i]);
                 }
             }
+
+            // Generate Excel file
+            GenerateExcelFile(htmlJobPages, keywordsToLookOutFor);
 
             DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
         }
 
 
-        private static List<string> ScrapeJobPages(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit)
+        private static List<string> ScrapeJobPages(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit, out List<string> urls)
         {
 
             //Scraping the Job Query page which holds all the job listings.
-
+            urls = new List<string>();
             List<string> individualJobPages = new List<string>();
 
             string domain = "https://seek.co.nz";
@@ -151,6 +176,7 @@ namespace SeekNZScraper
                                     WebClient _webClient = new WebClient(); //Deprecated
                                     string htmlJobPage = webClient.DownloadString(fullJobLink);
                                     individualJobPages.Add(htmlJobPage);
+                                    urls.Add(fullJobLink);
                                 }
                             }
                         }
@@ -166,7 +192,7 @@ namespace SeekNZScraper
             return individualJobPages;
         }
 
-        static void ScrapeIndividualJobPage(string htmlJobPage, List<Keyword> keywordsToLookOutFor)
+        static void ScrapeIndividualJobPage(string htmlJobPage, List<Keyword> keywordsToLookOutFor, string url)
         {
 
             // Parse the HTML using HtmlAgilityPack
@@ -190,9 +216,10 @@ namespace SeekNZScraper
                                 {
                                     if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
                                     {
-                                        if (!_keyword.urls.Contains(htmlJobPage))
+                                        if (!_keyword.Urls.Contains(htmlJobPage))
                                         {
-                                            _keyword.urls.Add(htmlJobPage);
+                                            _keyword.HtmlStrings.Add(htmlJobPage);
+                                            _keyword.Urls.Add(url);
                                             _keyword.IncrementCount();
                                         }
                                     }
@@ -234,6 +261,47 @@ namespace SeekNZScraper
             }
 
 
+        }
+
+        static void GenerateExcelFile(List<string> jobPages, List<Keyword> keywordsToLookOutFor)
+        {
+            string excelFilePath = "JobPages.xlsx";
+
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Job Pages");
+
+                // Add headers
+                worksheet.Cell(1, 1).Value = "Keyword";
+                worksheet.Cell(1, 2).Value = "Count";
+                worksheet.Cell(1, 3).Value = "URLs";
+
+                
+
+                // Sort the keywords by Count in descending order
+                keywordsToLookOutFor = keywordsToLookOutFor.OrderByDescending(k => k.Count).ToList();
+
+                // Add data to worksheet
+                int row = 2;
+                foreach (var keyword in keywordsToLookOutFor)
+                {
+                    worksheet.Cell(row, 1).Value = keyword.Name;
+                    worksheet.Cell(row, 2).Value = keyword.Count;
+                    foreach (var url in keyword.Urls)
+                    {
+                        worksheet.Cell(row, 3).Value = url;
+                        row++;
+                    }
+                    row++;
+                }
+
+                // Save the workbook
+                workbook.SaveAs(excelFilePath);
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Excel file '{excelFilePath}' has been generated successfully.");
+            Console.ResetColor();
         }
 
         private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)

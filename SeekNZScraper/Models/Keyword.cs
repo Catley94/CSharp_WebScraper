@@ -14,6 +14,8 @@ namespace SeekNZScraper.Models
         public List<string> HtmlStrings = new List<string>();
         public List<string> Urls = new List<string>();
 
+        public List<string> JobNames = new List<string>();
+
         public Keyword(string _Name) 
         {
             Name = _Name;

@@ -28,7 +28,7 @@ namespace SeekNZScraper
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 50;
+            int pageLimit = 1;
             int highlightKeywordsGreaterThanCount = 10;
 
             if (File.Exists(filePath))
@@ -202,6 +202,7 @@ namespace SeekNZScraper
             HtmlDocument _doc = new HtmlDocument();
             _doc.LoadHtml(htmlJobPage);
 
+            HtmlNodeCollection? h1s = _doc.DocumentNode.SelectNodes(".//h1");
             foreach (HtmlNode? _section in _doc.DocumentNode.SelectNodes("//section"))
             {
                 HtmlNodeCollection? unorderedLists = _section.SelectNodes(".//ul");
@@ -212,24 +213,33 @@ namespace SeekNZScraper
                         HtmlNodeCollection? _lis = _ul.SelectNodes(".//li");
                         foreach (HtmlNode? _li in _lis)
                         {
-                            List<string> keywordsToAdd = new List<string>();
                             if (_li != null)
                             {
                                 foreach (var _keyword in keywordsToLookOutFor)
                                 {
                                     if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
                                     {
-                                        if (!_keyword.Urls.Contains(htmlJobPage))
+                                        if (!_keyword.HtmlStrings.Contains(htmlJobPage))
                                         {
                                             _keyword.HtmlStrings.Add(htmlJobPage);
                                             _keyword.Urls.Add(url);
                                             _keyword.IncrementCount();
+                                            if (h1s != null)
+                                            {
+                                                _keyword.JobNames.Add(h1s[0].InnerText);
+                                                //foreach (HtmlNode? _h1 in h1s)
+                                                //{
+                                                //    if (_h1 != null)
+                                                //    {
+                                                //        _keyword.JobNames.Add(_h1.InnerText);
+                                                //    }
+                                                //}
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-
                     }
                 }
             }
@@ -280,7 +290,8 @@ namespace SeekNZScraper
                 // Add headers
                 worksheet.Cell(1, 1).Value = "Keyword";
                 worksheet.Cell(1, 2).Value = "Count";
-                worksheet.Cell(1, 3).Value = "URLs";
+                worksheet.Cell(1, 3).Value = "Job Titles";
+                worksheet.Cell(1, 4).Value = "URLs";
 
                 
 
@@ -293,11 +304,14 @@ namespace SeekNZScraper
                 {
                     worksheet.Cell(row, 1).Value = keyword.Name;
                     worksheet.Cell(row, 2).Value = keyword.Count;
-                    foreach (var url in keyword.Urls)
+
+                    for (short i = 0; i < keyword.Urls.Count - 1; i++)
                     {
-                        worksheet.Cell(row, 3).Value = url;
+                        worksheet.Cell(row, 3).Value = keyword.JobNames[i];
+                        worksheet.Cell(row, 4).Value = keyword.Urls[i];
                         row++;
                     }
+
                     row++;
                 }
 

@@ -19,7 +19,8 @@ namespace SeekNZScraper
         {
 
             string role = "developer";
-            string domain = "https://seek.co.nz"; // https://uk.indeed.com
+            //string domain = "https://seek.co.nz";
+            string domain = "https://uk.indeed.com";
 
             //Offline use
             DateTime date = DateTime.Now.Date;
@@ -214,33 +215,26 @@ namespace SeekNZScraper
                 //When there isn't a page available, it will not have an "<article>" but a "<section>" with value of "No matching search results"
                 for (int pageNum = 0; pageNum <= pageLimit * 10; pageNum += 10) //pageLimit = 50 * 10 = 500 = 51 pages
                 {
-                    ConsoleWriteWithColour($"Page: {pageNum}", ConsoleColor.Yellow);
+                    string _url = url + pageNum;
+                    ConsoleWriteWithColour($"Page: {pageNum / 10}", ConsoleColor.Yellow);
 
                     WebClient webClient = new WebClient(); //Deprecated
                                                            //+ page number: https://seek.co.nz/developer-jobs/in-auckland?page=1
-                    string mainHTMLJobQuery = webClient.DownloadString(url + pageQuery + pageNum);
+                    string mainHTMLJobQuery = webClient.DownloadString(_url+ "&vjk=c35e05af0c4407cb");
 
                     // Parse the HTML using HtmlAgilityPack
                     HtmlDocument doc = new HtmlDocument();
                     doc.LoadHtml(mainHTMLJobQuery);
 
                     //Search for articles
-                    HtmlNodeCollection? jobListings = doc.DocumentNode.SelectNodes("//ul");
+                    HtmlNodeCollection? unorderedLists = doc.DocumentNode.SelectNodes("//ul");
 
 
                     //Check if there are any articles, if not, there are no more pages to scrape
-                    if (jobListings == null)
+                    if (unorderedLists == null)
                     {
 
-                        foreach (var jobListing in jobListings)
-                        {
-                            if (jobListing.HasClass("eu4oa1w0"))
-                            {
-                                //Perhaps instead of this,see if jobListings can be filtered to return only with a HasClass("eu4oa1w0");
-
-                                //That will allow me to loop through the correct <li> tags.
-                            }
-                        }
+                        
 
 
                         HtmlNodeCollection sections = doc.DocumentNode.SelectNodes("//section");
@@ -277,30 +271,34 @@ namespace SeekNZScraper
                     }
                     else
                     {
-                        // Find all article tags
-                        foreach (HtmlNode? article in articles)
+
+                        IEnumerable<HtmlNode> filteredJobListings = unorderedLists
+                                                                    .Where(jobListing => jobListing.HasClass("eu4oa1w0"));
+
+                        foreach (HtmlNode filteredJobListing in filteredJobListings)
                         {
-                            // Find all h3 tags inside the article tag
-                            var jobTitles = article.SelectNodes(".//h3");
-
-
-                            // If there are any h3 tags, print out their text content
-                            if (jobTitles != null)
+                            HtmlNodeCollection? allJobListings = filteredJobListing.SelectNodes(".//li");
+                            foreach (HtmlNode? jobListing in allJobListings)
                             {
-                                //Only ever going to be one job title per article... 
-                                foreach (HtmlNode jobTitle in jobTitles)
+
+                                HtmlNodeCollection? headings = filteredJobListing.SelectNodes(".//h2");
+
+                                if(headings != null)
                                 {
-                                    string _jobTitle = jobTitle.InnerText;
-                                    HtmlNodeCollection? _jobLinkPostFix = jobTitle.SelectNodes(".//a");
-                                    string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
+                                    HtmlNode heading = headings[0];
+                                    string _jobTitle = heading.InnerText;
 
-                                    ConsoleWriteWithColour(_jobTitle, ConsoleColor.Cyan);
-                                    ConsoleWriteWithColour($"Page Link: {fullJobLink}", ConsoleColor.Green);
-
-                                    WebClient _webClient = new WebClient(); //Deprecated
-                                    string htmlJobPage = webClient.DownloadString(fullJobLink);
-                                    individualJobPages.Add(htmlJobPage);
-                                    urls.Add(fullJobLink);
+                                    HtmlNode? aTag = heading.SelectNodes(".//a")[0];
+                                    if (aTag != null)
+                                    {
+                                        string fullJobLink = aTag.GetAttributeValue("href", string.Empty);
+                                        ConsoleWriteWithColour(_jobTitle, ConsoleColor.Cyan);
+                                        ConsoleWriteWithColour($"Page Link: {fullJobLink}", ConsoleColor.Green);
+                                        WebClient _webClient = new WebClient(); //Deprecated
+                                        string htmlJobPage = webClient.DownloadString(fullJobLink);
+                                        individualJobPages.Add(htmlJobPage);
+                                        urls.Add(fullJobLink);
+                                    }
                                 }
                             }
                         }
@@ -324,7 +322,8 @@ namespace SeekNZScraper
                 case "https://seek.co.nz":
                     return ScrapeSeekNZJobPages(role, domain, keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
                 case "https://uk.indeed.com":
-                    return ScrapeIndeedUKJobPages(role, domain, keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
+                    var result = ScrapeIndeedUKJobPages(role, domain, keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
+                    return result;
             }
             return new List<string>();
         }

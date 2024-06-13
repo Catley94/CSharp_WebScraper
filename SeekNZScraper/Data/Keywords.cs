@@ -5,6 +5,8 @@ namespace SeekNZScraper.Data
     public class Keywords
     {
         private List<Keyword> keywordsToLookOutFor = new List<Keyword>() {
+                new Keyword("Unreal"),
+                new Keyword("Unity"),
                 new Keyword("C#"),
                 new Keyword("C++"),
                 new Keyword("Cpp"),

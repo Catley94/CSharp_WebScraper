@@ -28,7 +28,7 @@ namespace SeekNZScraper
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 1;
+            int pageLimit = 50;
             int highlightKeywordsGreaterThanCount = 10;
 
             if (File.Exists(filePath))

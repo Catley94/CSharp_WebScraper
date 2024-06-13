@@ -18,6 +18,9 @@ namespace SeekNZScraper
         static void Main(string[] args)
         {
 
+            string role = "developer";
+            string domain = "https://seek.co.nz"; // https://uk.indeed.com
+
             //Offline use
             DateTime date = DateTime.Now.Date;
             string filePath = $"jobPages-{date.ToString("dd-MM-yyyy-HH-mm-ss")}.json";
@@ -28,7 +31,7 @@ namespace SeekNZScraper
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 50;
+            int pageLimit = 100;
             int highlightKeywordsGreaterThanCount = 10;
 
             if (File.Exists(filePath))
@@ -52,7 +55,7 @@ namespace SeekNZScraper
                 
                 ConsoleWriteWithColour("Scraping pages.", ConsoleColor.Blue);
                 // Scrape the website to populate the list
-                htmlJobPages = ScrapeJobPages(keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
+                htmlJobPages = ScrapeJobPages(role, domain, keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
                 ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
 
                 saveData = new JsonSaveData(htmlJobPages, urls);
@@ -84,22 +87,19 @@ namespace SeekNZScraper
             DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
         }
 
-
-        private static List<string> ScrapeJobPages(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit, out List<string> urls)
+        private static List<string> ScrapeSeekNZJobPages(string role, string domain, List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit, out List<string> urls)
         {
-
             //Scraping the Job Query page which holds all the job listings.
             urls = new List<string>();
             List<string> individualJobPages = new List<string>();
 
-            string domain = "https://seek.co.nz";
-            string keyword = "developer";
+
             string location = "auckland";
             string pageQuery = "?page=";
-            
+
 
             // Load the HTML from the URL
-            string url = $"{domain}/{keyword}-jobs/in-{location}{pageQuery}";
+            string url = $"{domain}/{role}-jobs/in-{location}{pageQuery}";
 
             try
             {
@@ -191,8 +191,142 @@ namespace SeekNZScraper
             {
                 ConsoleWriteWithColour("Stopping scraper...", ConsoleColor.Red);
             }
-            
             return individualJobPages;
+        }
+
+        private static List<string> ScrapeIndeedUKJobPages(string role, string domain, List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit, out List<string> urls)
+        {
+            //Scraping the Job Query page which holds all the job listings.
+            urls = new List<string>();
+            List<string> individualJobPages = new List<string>();
+
+
+            string location = "London";
+            string pageQuery = "&start=";
+
+            // Load the HTML from the URL
+            string url = $"{domain}/jobs?q={role}&l={location}{pageQuery}";
+
+            //Pages: &start=0 = page 1, &start=10 = page 2, &start=20 = page 3, &start=30 = page4
+            try
+            {
+                //Currently guess work as to how many pages.
+                //When there isn't a page available, it will not have an "<article>" but a "<section>" with value of "No matching search results"
+                for (int pageNum = 0; pageNum <= pageLimit * 10; pageNum += 10) //pageLimit = 50 * 10 = 500 = 51 pages
+                {
+                    ConsoleWriteWithColour($"Page: {pageNum}", ConsoleColor.Yellow);
+
+                    WebClient webClient = new WebClient(); //Deprecated
+                                                           //+ page number: https://seek.co.nz/developer-jobs/in-auckland?page=1
+                    string mainHTMLJobQuery = webClient.DownloadString(url + pageQuery + pageNum);
+
+                    // Parse the HTML using HtmlAgilityPack
+                    HtmlDocument doc = new HtmlDocument();
+                    doc.LoadHtml(mainHTMLJobQuery);
+
+                    //Search for articles
+                    HtmlNodeCollection? jobListings = doc.DocumentNode.SelectNodes("//ul");
+
+
+                    //Check if there are any articles, if not, there are no more pages to scrape
+                    if (jobListings == null)
+                    {
+
+                        foreach (var jobListing in jobListings)
+                        {
+                            if (jobListing.HasClass("eu4oa1w0"))
+                            {
+                                //Perhaps instead of this,see if jobListings can be filtered to return only with a HasClass("eu4oa1w0");
+
+                                //That will allow me to loop through the correct <li> tags.
+                            }
+                        }
+
+
+                        HtmlNodeCollection sections = doc.DocumentNode.SelectNodes("//section");
+                        if (sections.Count > 0)
+                        {
+                            HtmlNodeCollection h3Nodes = doc.DocumentNode.SelectNodes(".//h3");
+                            if (h3Nodes.Count > 0)
+                            {
+                                foreach (var h3 in h3Nodes)
+                                {
+                                    if (h3.InnerText.Contains("No matching", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        ConsoleWriteWithColour("No more pages. Exiting...", ConsoleColor.Blue);
+                                        throw new LoopBreakException();
+                                    }
+                                    else
+                                    {
+                                        Console.Error.WriteLine("There is an h3, but may have changed their wording. Exiting...");
+                                        throw new LoopBreakException();
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                Console.Error.WriteLine("There are no articles, but there is a section, but no h3. Exiting...");
+                                throw new LoopBreakException();
+                            }
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine("There are no articles or sections found on the page. Exiting...");
+                            throw new LoopBreakException();
+                        }
+                    }
+                    else
+                    {
+                        // Find all article tags
+                        foreach (HtmlNode? article in articles)
+                        {
+                            // Find all h3 tags inside the article tag
+                            var jobTitles = article.SelectNodes(".//h3");
+
+
+                            // If there are any h3 tags, print out their text content
+                            if (jobTitles != null)
+                            {
+                                //Only ever going to be one job title per article... 
+                                foreach (HtmlNode jobTitle in jobTitles)
+                                {
+                                    string _jobTitle = jobTitle.InnerText;
+                                    HtmlNodeCollection? _jobLinkPostFix = jobTitle.SelectNodes(".//a");
+                                    string fullJobLink = domain + _jobLinkPostFix?[0].GetAttributeValue("href", string.Empty);
+
+                                    ConsoleWriteWithColour(_jobTitle, ConsoleColor.Cyan);
+                                    ConsoleWriteWithColour($"Page Link: {fullJobLink}", ConsoleColor.Green);
+
+                                    WebClient _webClient = new WebClient(); //Deprecated
+                                    string htmlJobPage = webClient.DownloadString(fullJobLink);
+                                    individualJobPages.Add(htmlJobPage);
+                                    urls.Add(fullJobLink);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (LoopBreakException)
+            {
+                ConsoleWriteWithColour("Stopping scraper...", ConsoleColor.Red);
+            }
+            return individualJobPages;
+        }
+
+        private static List<string> ScrapeJobPages(string role, string domain, List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit, out List<string> urls)
+        {
+            //Scraping the Job Query page which holds all the job listings.
+            urls = new List<string>();
+
+            switch (domain)
+            {
+                case "https://seek.co.nz":
+                    return ScrapeSeekNZJobPages(role, domain, keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
+                case "https://uk.indeed.com":
+                    return ScrapeIndeedUKJobPages(role, domain, keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
+            }
+            return new List<string>();
         }
 
         static void ScrapeIndividualJobPage(string htmlJobPage, List<Keyword> keywordsToLookOutFor, string url)

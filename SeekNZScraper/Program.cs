@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using ClosedXML.Excel;
 using DocumentFormat.OpenXml.Spreadsheet;
@@ -18,9 +19,15 @@ namespace SeekNZScraper
         static void Main(string[] args)
         {
 
+            //DateTime? pastDateTime = new DateTime(2024, 06, 09);
+            DateTime? pastDateTime = null;
+
             //Offline use
             DateTime date = DateTime.Now.Date;
-            string filePath = $"jobPages-{date.ToString("dd-MM-yyyy-HH-mm-ss")}.json";
+
+            DateTime? chosenDate = (pastDateTime != null ? pastDateTime : date);
+
+            string filePath = $"jobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}.json";
 
             JsonSaveData? saveData;
             List<string> htmlJobPages = new List<string>();
@@ -79,7 +86,7 @@ namespace SeekNZScraper
             }
 
             // Generate Excel file
-            GenerateExcelFile(htmlJobPages, keywordsToLookOutFor);
+            GenerateExcelFile(htmlJobPages, keywordsToLookOutFor, chosenDate);
 
             DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
         }
@@ -217,7 +224,11 @@ namespace SeekNZScraper
                             {
                                 foreach (var _keyword in keywordsToLookOutFor)
                                 {
-                                    if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
+                                    string escapedKeyword = Regex.Escape(_keyword.Name);
+                                    string pattern = $@"\b{escapedKeyword}\b";
+
+                                    //if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
+                                    if (Regex.IsMatch(_li.InnerText, pattern, RegexOptions.IgnoreCase))
                                     {
                                         if (!_keyword.HtmlStrings.Contains(htmlJobPage))
                                         {
@@ -276,52 +287,105 @@ namespace SeekNZScraper
 
         }
 
-        static void GenerateExcelFile(List<string> jobPages, List<Keyword> keywordsToLookOutFor)
+        static void GenerateExcelFile(List<string> jobPages, List<Keyword> keywordsToLookOutFor, DateTime? chosenDate)
         {
-            DateTime date = DateTime.Now.Date;
+            //string excelFilePath = $"JobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}.xlsx";
 
 
-            string excelFilePath = $"JobPages-{date.ToString("dd-MM-yyyy-HH-mm-ss")}.xlsx";
+            string excelFilePath = $"JobPages-Seek.xlsx";
 
-            using (var workbook = new XLWorkbook())
+            XLWorkbook workbook;
+
+            // Check if the Excel file already exists
+            if (File.Exists(excelFilePath))
             {
-                var worksheet = workbook.Worksheets.Add("Job Pages");
+                // Open the existing workbook
+                workbook = new XLWorkbook(excelFilePath);
+            }
+            else
+            {
+                // Create a new workbook
+                workbook = new XLWorkbook();
+            }
 
-                // Add headers
-                worksheet.Cell(1, 1).Value = "Keyword";
-                worksheet.Cell(1, 2).Value = "Count";
-                worksheet.Cell(1, 3).Value = "Job Titles";
-                worksheet.Cell(1, 4).Value = "URLs";
+            // Create a new worksheet with a unique name based on the current date and time
+            string worksheetName = $"{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}";
+            var worksheet = workbook.Worksheets.Add(worksheetName);
 
-                
+            // Add headers
+            worksheet.Cell(1, 1).Value = "Keyword";
+            worksheet.Cell(1, 2).Value = "Count";
+            worksheet.Cell(1, 3).Value = "Job Titles";
+            worksheet.Cell(1, 4).Value = "URLs";
 
-                // Sort the keywords by Count in descending order
-                keywordsToLookOutFor = keywordsToLookOutFor.OrderByDescending(k => k.Count).ToList();
+            // Sort the keywords by Count in descending order
+            keywordsToLookOutFor = keywordsToLookOutFor.OrderByDescending(k => k.Count).ToList();
 
-                // Add data to worksheet
-                int row = 2;
-                foreach (var keyword in keywordsToLookOutFor)
+            // Add data to worksheet
+            int row = 2;
+            foreach (var keyword in keywordsToLookOutFor)
+            {
+                worksheet.Cell(row, 1).Value = keyword.Name;
+                worksheet.Cell(row, 2).Value = keyword.Count;
+
+                for (short i = 0; i < keyword.Urls.Count - 1; i++)
                 {
-                    worksheet.Cell(row, 1).Value = keyword.Name;
-                    worksheet.Cell(row, 2).Value = keyword.Count;
-
-                    for (short i = 0; i < keyword.Urls.Count - 1; i++)
-                    {
-                        worksheet.Cell(row, 3).Value = keyword.JobNames[i];
-                        worksheet.Cell(row, 4).Value = keyword.Urls[i];
-                        row++;
-                    }
-
+                    worksheet.Cell(row, 3).Value = keyword.JobNames[i];
+                    worksheet.Cell(row, 4).Value = keyword.Urls[i];
                     row++;
                 }
 
-                // Save the workbook
-                workbook.SaveAs(excelFilePath);
+                row++;
             }
 
+            // Save the workbook
+            workbook.SaveAs(excelFilePath);
+
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Excel file '{excelFilePath}' has been generated successfully.");
+            Console.WriteLine($"Worksheet '{worksheetName}' has been added to Excel file '{excelFilePath}' successfully.");
             Console.ResetColor();
+
+
+
+            //using (var workbook = new XLWorkbook())
+            //{
+            //    var worksheet = workbook.Worksheets.Add("Job Pages");
+
+            //    // Add headers
+            //    worksheet.Cell(1, 1).Value = "Keyword";
+            //    worksheet.Cell(1, 2).Value = "Count";
+            //    worksheet.Cell(1, 3).Value = "Job Titles";
+            //    worksheet.Cell(1, 4).Value = "URLs";
+
+
+
+            //    // Sort the keywords by Count in descending order
+            //    keywordsToLookOutFor = keywordsToLookOutFor.OrderByDescending(k => k.Count).ToList();
+
+            //    // Add data to worksheet
+            //    int row = 2;
+            //    foreach (var keyword in keywordsToLookOutFor)
+            //    {
+            //        worksheet.Cell(row, 1).Value = keyword.Name;
+            //        worksheet.Cell(row, 2).Value = keyword.Count;
+
+            //        for (short i = 0; i < keyword.Urls.Count - 1; i++)
+            //        {
+            //            worksheet.Cell(row, 3).Value = keyword.JobNames[i];
+            //            worksheet.Cell(row, 4).Value = keyword.Urls[i];
+            //            row++;
+            //        }
+
+            //        row++;
+            //    }
+
+            //    // Save the workbook
+            //    workbook.SaveAs(excelFilePath);
+            //}
+
+            //Console.ForegroundColor = ConsoleColor.Green;
+            //Console.WriteLine($"Excel file '{excelFilePath}' has been generated successfully.");
+            //Console.ResetColor();
         }
 
         private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)

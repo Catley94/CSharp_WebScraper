@@ -19,7 +19,7 @@ namespace SeekNZScraper
         static void Main(string[] args)
         {
 
-            //DateTime? pastDateTime = new DateTime(2024, 06, 09);
+            //DateTime? pastDateTime = new DateTime(2024, 06, 17);
             DateTime? pastDateTime = null;
 
             //Offline use
@@ -28,6 +28,7 @@ namespace SeekNZScraper
             DateTime? chosenDate = (pastDateTime != null ? pastDateTime : date);
 
             string filePath = $"jobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}.json";
+            string excelFilePath = $"JobPages-Seek.xlsx";
 
             JsonSaveData? saveData;
             List<string> htmlJobPages = new List<string>();
@@ -85,8 +86,27 @@ namespace SeekNZScraper
                 }
             }
 
+            XLWorkbook workbook;
+
+            // Check if the Excel file already exists
+            if (File.Exists(excelFilePath))
+            {
+                // Open the existing workbook
+                workbook = new XLWorkbook(excelFilePath);
+            }
+            else
+            {
+                // Create a new workbook
+                workbook = new XLWorkbook();
+            }
+
             // Generate Excel file
-            GenerateExcelFile(htmlJobPages, keywordsToLookOutFor, chosenDate);
+            GenerateExcelFile(workbook, htmlJobPages, keywordsToLookOutFor, chosenDate);
+
+            AddDataToOverviewTab(workbook, keywordsToLookOutFor, chosenDate);
+
+            // Save the workbook
+            workbook.SaveAs(excelFilePath);
 
             DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
         }
@@ -287,30 +307,26 @@ namespace SeekNZScraper
 
         }
 
-        static void GenerateExcelFile(List<string> jobPages, List<Keyword> keywordsToLookOutFor, DateTime? chosenDate)
+        static void GenerateExcelFile(XLWorkbook workbook, List<string>? jobPages, List<Keyword> keywordsToLookOutFor, DateTime? chosenDate)
         {
             //string excelFilePath = $"JobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}.xlsx";
 
-
-            string excelFilePath = $"JobPages-Seek.xlsx";
-
-            XLWorkbook workbook;
-
-            // Check if the Excel file already exists
-            if (File.Exists(excelFilePath))
-            {
-                // Open the existing workbook
-                workbook = new XLWorkbook(excelFilePath);
-            }
-            else
-            {
-                // Create a new workbook
-                workbook = new XLWorkbook();
-            }
+            
 
             // Create a new worksheet with a unique name based on the current date and time
             string worksheetName = $"{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}";
-            var worksheet = workbook.Worksheets.Add(worksheetName);
+            IXLWorksheet worksheet;
+
+            if (workbook.Worksheets.Contains(worksheetName))
+            {
+                return;
+            }
+            else
+            {
+                // Add a new worksheet with the unique name
+                worksheet = workbook.Worksheets.Add(worksheetName);
+            }
+
 
             // Add headers
             worksheet.Cell(1, 1).Value = "Keyword";
@@ -338,54 +354,45 @@ namespace SeekNZScraper
                 row++;
             }
 
-            // Save the workbook
-            workbook.SaveAs(excelFilePath);
+            
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Worksheet '{worksheetName}' has been added to Excel file '{excelFilePath}' successfully.");
+            //Console.WriteLine($"Worksheet '{worksheetName}' has been added to Excel file '{excelFilePath}' successfully.");
             Console.ResetColor();
+        }
 
+        static void AddDataToOverviewTab(XLWorkbook workbook, List<Keyword> keywordsToLookOutFor, DateTime? chosenDate)
+        {
+            // Sort the keywords by Count in descending order
+            keywordsToLookOutFor = keywordsToLookOutFor.OrderByDescending(k => k.Count).ToList();
 
+            // Check if the "Overview" worksheet exists
+            IXLWorksheet worksheet;
+            if (workbook.Worksheets.TryGetWorksheet("Overview", out worksheet))
+            {
+                // Find the last used row in the worksheet
+                int lastUsedRowNumber = worksheet.LastRowUsed().RowNumber() + 1;
 
-            //using (var workbook = new XLWorkbook())
-            //{
-            //    var worksheet = workbook.Worksheets.Add("Job Pages");
+                // Add a row for the date
+                worksheet.Cell(lastUsedRowNumber, 1).Value = chosenDate?.ToString("dd-MM-yyyy");
 
-            //    // Add headers
-            //    worksheet.Cell(1, 1).Value = "Keyword";
-            //    worksheet.Cell(1, 2).Value = "Count";
-            //    worksheet.Cell(1, 3).Value = "Job Titles";
-            //    worksheet.Cell(1, 4).Value = "URLs";
+                // Add keyword data under the date row
+                int keywordDataRowNumber = lastUsedRowNumber + 1;
+                foreach (var keyword in keywordsToLookOutFor)
+                {
+                    worksheet.Cell(keywordDataRowNumber, 2).Value = keyword.Name;
+                    worksheet.Cell(keywordDataRowNumber, 3).Value = keyword.Count;
+                    keywordDataRowNumber++;
+                }
+            }
+            else
+            {
+                Console.WriteLine("The 'Overview' worksheet does not exist in the workbook.");
+            }
 
-
-
-            //    // Sort the keywords by Count in descending order
-            //    keywordsToLookOutFor = keywordsToLookOutFor.OrderByDescending(k => k.Count).ToList();
-
-            //    // Add data to worksheet
-            //    int row = 2;
-            //    foreach (var keyword in keywordsToLookOutFor)
-            //    {
-            //        worksheet.Cell(row, 1).Value = keyword.Name;
-            //        worksheet.Cell(row, 2).Value = keyword.Count;
-
-            //        for (short i = 0; i < keyword.Urls.Count - 1; i++)
-            //        {
-            //            worksheet.Cell(row, 3).Value = keyword.JobNames[i];
-            //            worksheet.Cell(row, 4).Value = keyword.Urls[i];
-            //            row++;
-            //        }
-
-            //        row++;
-            //    }
-
-            //    // Save the workbook
-            //    workbook.SaveAs(excelFilePath);
-            //}
-
-            //Console.ForegroundColor = ConsoleColor.Green;
-            //Console.WriteLine($"Excel file '{excelFilePath}' has been generated successfully.");
-            //Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Data for {chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")} has been added to 'Overview' tab successfully.");
+            Console.ResetColor();
         }
 
         private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)

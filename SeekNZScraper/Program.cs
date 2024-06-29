@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using ClosedXML.Excel;
-using DocumentFormat.OpenXml.Spreadsheet;
 using HtmlAgilityPack;
 using SeekNZScraper.Data;
 using SeekNZScraper.Models;
@@ -27,8 +22,8 @@ namespace SeekNZScraper
 
             DateTime? chosenDate = (pastDateTime != null ? pastDateTime : date);
 
-            string filePath = $"jobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}.json";
-            string excelFilePath = $"JobPages-Seek.xlsx";
+            
+           
 
             JsonSaveData? saveData;
             List<string> htmlJobPages = new List<string>();
@@ -37,82 +32,98 @@ namespace SeekNZScraper
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
             int pageLimit = 50;
-            int highlightKeywordsGreaterThanCount = 10;
 
-            if (File.Exists(filePath))
+            List<string> keywords = new List<string>();
+            //To allow backward compatibility
+            if (pastDateTime == null)
             {
-                // Load the list from the file
-                string json = File.ReadAllText(filePath);
-                JsonSerializerOptions options = new JsonSerializerOptions
-                {
-                    IncludeFields = true
-                };
-                saveData = JsonSerializer.Deserialize<JsonSaveData>(json, options);
-                if(saveData != null)
-                {
-                    htmlJobPages = saveData.HtmlStrings;
-                    urls = saveData.Urls;
-                }
-                ConsoleWriteWithColour("Loaded job pages from file.", ConsoleColor.Green);
+                keywords = new List<string>() { "developer" }; // Add new keywords here
             }
             else
             {
-                
-                ConsoleWriteWithColour("Scraping pages.", ConsoleColor.Blue);
-                // Scrape the website to populate the list
-                htmlJobPages = ScrapeJobPages(keywordsToLookOutFor, highlightKeywordsGreaterThanCount, pageLimit, out urls);
-                ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
-
-                saveData = new JsonSaveData(htmlJobPages, urls);
-
-                try 
-                {
-                    // Save the list to the file
-                    string json = JsonSerializer.Serialize(saveData, new JsonSerializerOptions { WriteIndented = true });
-                    File.WriteAllText(filePath, json);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Serialization failed: {ex.Message}");
-                }
-                
+                keywords = new List<string>() { "developer" };
             }
-
-            if (htmlJobPages != null)
+            
+            
+            foreach (string keyword in keywords)
             {
-                for (short i = 0; i < htmlJobPages.Count - 1; i++)
+                string excelFilePath = $"JobPages-Seek-{keyword}.xlsx";
+                string jsonFilePath = $"jobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}-{keyword}.json";
+                if (File.Exists(jsonFilePath))
                 {
-                    ScrapeIndividualJobPage(htmlJobPages[i], keywordsToLookOutFor, urls[i]);
+                    // Load the list from the file
+                    string json = File.ReadAllText(jsonFilePath);
+                    JsonSerializerOptions options = new JsonSerializerOptions
+                    {
+                        IncludeFields = true
+                    };
+                    saveData = JsonSerializer.Deserialize<JsonSaveData>(json, options);
+                    if(saveData != null)
+                    {
+                        htmlJobPages = saveData.HtmlStrings;
+                        urls = saveData.Urls;
+                    }
+                    ConsoleWriteWithColour("Loaded job pages from file.", ConsoleColor.Green);
                 }
+                else
+                {
+                    
+                    ConsoleWriteWithColour($"Scraping pages for role: {keyword}.", ConsoleColor.Blue);
+                    // Scrape the website to populate the list
+                    htmlJobPages = ScrapeJobPages(keyword, pageLimit, out urls);
+                    ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
+
+                    saveData = new JsonSaveData(htmlJobPages, urls);
+
+                    try 
+                    {
+                        // Save the list to the file
+                        string json = JsonSerializer.Serialize(saveData, new JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(jsonFilePath, json);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Serialization failed: {ex.Message}");
+                    }
+                    
+                }
+
+                if (htmlJobPages != null)
+                {
+                    for (short i = 0; i < htmlJobPages.Count - 1; i++)
+                    {
+                        ScrapeIndividualJobPage(htmlJobPages[i], keywordsToLookOutFor, urls[i]);
+                    }
+                }
+
+                XLWorkbook workbook;
+
+                // Check if the Excel file already exists
+                if (File.Exists(excelFilePath))
+                {
+                    // Open the existing workbook
+                    workbook = new XLWorkbook(excelFilePath);
+                }
+                else
+                {
+                    // Create a new workbook
+                    workbook = new XLWorkbook();
+                }
+
+                // Generate Excel file
+                GenerateExcelFile(workbook, htmlJobPages, keywordsToLookOutFor, chosenDate);
+
+                AddDataToOverviewTab(workbook, keywordsToLookOutFor, chosenDate);
+
+                // Save the workbook
+                workbook.SaveAs(excelFilePath);
+
+                DisplayScrapingResults(keywordsToLookOutFor);
             }
-
-            XLWorkbook workbook;
-
-            // Check if the Excel file already exists
-            if (File.Exists(excelFilePath))
-            {
-                // Open the existing workbook
-                workbook = new XLWorkbook(excelFilePath);
-            }
-            else
-            {
-                // Create a new workbook
-                workbook = new XLWorkbook();
-            }
-
-            // Generate Excel file
-            GenerateExcelFile(workbook, htmlJobPages, keywordsToLookOutFor, chosenDate);
-
-            AddDataToOverviewTab(workbook, keywordsToLookOutFor, chosenDate);
-
-            // Save the workbook
-            workbook.SaveAs(excelFilePath);
-
-            DisplayScrapingResults(keywordsToLookOutFor, highlightKeywordsGreaterThanCount);
         }
 
 
-        private static List<string> ScrapeJobPages(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount, int pageLimit, out List<string> urls)
+        private static List<string> ScrapeJobPages(string keyword, int pageLimit, out List<string> urls)
         {
 
             //Scraping the Job Query page which holds all the job listings.
@@ -120,7 +131,6 @@ namespace SeekNZScraper
             List<string> individualJobPages = new List<string>();
 
             string domain = "https://seek.co.nz";
-            string keyword = "developer";
             string location = "auckland";
             string pageQuery = "?page=";
             
@@ -238,33 +248,36 @@ namespace SeekNZScraper
                     foreach (HtmlNode? _ul in unorderedLists)
                     {
                         HtmlNodeCollection? _lis = _ul.SelectNodes(".//li");
-                        foreach (HtmlNode? _li in _lis)
+                        if (_lis != null)
                         {
-                            if (_li != null)
+                            foreach (HtmlNode? _li in _lis)
                             {
-                                foreach (var _keyword in keywordsToLookOutFor)
+                                if (_li != null)
                                 {
-                                    string escapedKeyword = Regex.Escape(_keyword.Name);
-                                    string pattern = $@"\b{escapedKeyword}\b";
-
-                                    //if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
-                                    if (Regex.IsMatch(_li.InnerText, pattern, RegexOptions.IgnoreCase))
+                                    foreach (var _keyword in keywordsToLookOutFor)
                                     {
-                                        if (!_keyword.HtmlStrings.Contains(htmlJobPage))
+                                        string escapedKeyword = Regex.Escape(_keyword.Name);
+                                        string pattern = $@"\b{escapedKeyword}\b";
+
+                                        //if (_li.InnerText.Contains(_keyword.Name, StringComparison.OrdinalIgnoreCase))
+                                        if (Regex.IsMatch(_li.InnerText, pattern, RegexOptions.IgnoreCase))
                                         {
-                                            _keyword.HtmlStrings.Add(htmlJobPage);
-                                            _keyword.Urls.Add(url);
-                                            _keyword.IncrementCount();
-                                            if (h1s != null)
+                                            if (!_keyword.HtmlStrings.Contains(htmlJobPage))
                                             {
-                                                _keyword.JobNames.Add(h1s[0].InnerText);
-                                                //foreach (HtmlNode? _h1 in h1s)
-                                                //{
-                                                //    if (_h1 != null)
-                                                //    {
-                                                //        _keyword.JobNames.Add(_h1.InnerText);
-                                                //    }
-                                                //}
+                                                _keyword.HtmlStrings.Add(htmlJobPage);
+                                                _keyword.Urls.Add(url);
+                                                _keyword.IncrementCount();
+                                                if (h1s != null)
+                                                {
+                                                    _keyword.JobNames.Add(h1s[0].InnerText);
+                                                    //foreach (HtmlNode? _h1 in h1s)
+                                                    //{
+                                                    //    if (_h1 != null)
+                                                    //    {
+                                                    //        _keyword.JobNames.Add(_h1.InnerText);
+                                                    //    }
+                                                    //}
+                                                }
                                             }
                                         }
                                     }
@@ -276,7 +289,7 @@ namespace SeekNZScraper
             }
         }
 
-        private static void DisplayScrapingResults(List<Keyword> keywordsToLookOutFor, int highlightKeywordsGreaterThanCount)
+        private static void DisplayScrapingResults(List<Keyword> keywordsToLookOutFor)
         {
 
             // Sort the keywords by Count in descending order

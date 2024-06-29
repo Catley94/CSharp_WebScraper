@@ -10,10 +10,12 @@ namespace SeekNZScraper
 {
     internal class Program
     {
-
+        /// <summary>
+        /// The entry point for the application.
+        /// </summary>
+        /// <param name="args">The command-line arguments passed to the application.</param>
         static void Main(string[] args)
         {
-
             //DateTime? pastDateTime = new DateTime(2024, 06, 17);
             DateTime? pastDateTime = null;
 
@@ -33,22 +35,22 @@ namespace SeekNZScraper
 
             int pageLimit = 50;
 
-            List<string> keywords = new List<string>();
+            List<string> roles = new List<string>();
             //To allow backward compatibility
             if (pastDateTime == null)
             {
-                keywords = new List<string>() { "developer" }; // Add new keywords here
+                roles = new List<string>() { "developer" }; // Add new keywords here
             }
             else
             {
-                keywords = new List<string>() { "developer" };
+                roles = new List<string>() { "developer" };
             }
             
             
-            foreach (string keyword in keywords)
+            foreach (string role in roles)
             {
-                string excelFilePath = $"JobPages-Seek-{keyword}.xlsx";
-                string jsonFilePath = $"jobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}-{keyword}.json";
+                string excelFilePath = $"JobPages-Seek-{role}.xlsx";
+                string jsonFilePath = $"jobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}-{role}.json";
                 if (File.Exists(jsonFilePath))
                 {
                     // Load the list from the file
@@ -68,9 +70,9 @@ namespace SeekNZScraper
                 else
                 {
                     
-                    ConsoleWriteWithColour($"Scraping pages for role: {keyword}.", ConsoleColor.Blue);
+                    ConsoleWriteWithColour($"Scraping pages for role: {role}.", ConsoleColor.Blue);
                     // Scrape the website to populate the list
-                    htmlJobPages = ScrapeJobPages(keyword, pageLimit, out urls);
+                    htmlJobPages = ScrapeJobPages(role, pageLimit, out urls);
                     ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
 
                     saveData = new JsonSaveData(htmlJobPages, urls);
@@ -123,7 +125,14 @@ namespace SeekNZScraper
         }
 
 
-        private static List<string> ScrapeJobPages(string keyword, int pageLimit, out List<string> urls)
+        /// <summary>
+        /// Scrapes the job pages for a given keyword and page limit.
+        /// </summary>
+        /// <param name="role">The role to search for in job listings.</param>
+        /// <param name="pageLimit">The maximum number of pages to scrape.</param>
+        /// <param name="urls">Out parameter that will contain the URLs of the scraped job pages.</param>
+        /// <returns>A list of individual job pages scraped from the website.</returns>
+        private static List<string> ScrapeJobPages(string role, int pageLimit, out List<string> urls)
         {
 
             //Scraping the Job Query page which holds all the job listings.
@@ -136,7 +145,7 @@ namespace SeekNZScraper
             
 
             // Load the HTML from the URL
-            string url = $"{domain}/{keyword}-jobs/in-{location}{pageQuery}";
+            string url = $"{domain}/{role}-jobs/in-{location}{pageQuery}";
 
             try
             {
@@ -232,6 +241,12 @@ namespace SeekNZScraper
             return individualJobPages;
         }
 
+        /// <summary>
+        /// Scrapes individual job page for specific keywords.
+        /// </summary>
+        /// <param name="htmlJobPage">The HTML content of the job page to scrape.</param>
+        /// <param name="keywordsToLookOutFor">The list of keywords to search for in the job page.</param>
+        /// <param name="url">The URL of the job page being scraped.</param>
         static void ScrapeIndividualJobPage(string htmlJobPage, List<Keyword> keywordsToLookOutFor, string url)
         {
 
@@ -289,6 +304,10 @@ namespace SeekNZScraper
             }
         }
 
+        /// <summary>
+        /// Display the scraping results by printing a summary of keywords and their counts to the console.
+        /// </summary>
+        /// <param name="keywordsToLookOutFor">The list of keywords to display.</param>
         private static void DisplayScrapingResults(List<Keyword> keywordsToLookOutFor)
         {
 
@@ -320,6 +339,13 @@ namespace SeekNZScraper
 
         }
 
+        /// <summary>
+        /// Generates an Excel file with data from job pages.
+        /// </summary>
+        /// <param name="workbook">The workbook to which the Excel file will be generated.</param>
+        /// <param name="jobPages">The list of job pages to use for generating the Excel file.</param>
+        /// <param name="keywordsToLookOutFor">The list of keywords to look out for in the job pages.</param>
+        /// <param name="chosenDate">The chosen date for generating the Excel file.</param>
         static void GenerateExcelFile(XLWorkbook workbook, List<string>? jobPages, List<Keyword> keywordsToLookOutFor, DateTime? chosenDate)
         {
             //string excelFilePath = $"JobPages-{chosenDate?.ToString("dd-MM-yyyy-HH-mm-ss")}.xlsx";
@@ -374,6 +400,12 @@ namespace SeekNZScraper
             Console.ResetColor();
         }
 
+        /// <summary>
+        /// Adds data to the "Overview" worksheet in the given Excel workbook.
+        /// </summary>
+        /// <param name="workbook">The Excel workbook to add data to.</param>
+        /// <param name="keywordsToLookOutFor">The list of keywords to add to the worksheet.</param>
+        /// <param name="chosenDate">The chosen date to add as a row in the worksheet.</param>
         static void AddDataToOverviewTab(XLWorkbook workbook, List<Keyword> keywordsToLookOutFor, DateTime? chosenDate)
         {
             // Sort the keywords by Count in descending order
@@ -408,6 +440,11 @@ namespace SeekNZScraper
             Console.ResetColor();
         }
 
+        /// <summary>
+        /// Writes a message to the console with the specified text color.
+        /// </summary>
+        /// <param name="message">The message to write to the console.</param>
+        /// <param name="color">The color of the text. The default value is ConsoleColor.White.</param>
         private static void ConsoleWriteWithColour(string message, ConsoleColor color = ConsoleColor.White)
         {
             Console.ForegroundColor = color;

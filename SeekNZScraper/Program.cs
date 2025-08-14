@@ -10,11 +10,72 @@ namespace SeekNZScraper
 {
     internal class Program
     {
+        private static readonly HttpClient httpClient = CreateHttpClient();
+
+        /// <summary>
+        /// Creates a properly configured HttpClient for web scraping
+        /// </summary>
+        private static HttpClient CreateHttpClient()
+        {
+            var handler = new SocketsHttpHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+                AllowAutoRedirect = true,
+                UseCookies = true,
+                CookieContainer = new CookieContainer(),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            };
+
+            var client = new HttpClient(handler);
+            
+            // Add realistic browser headers
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+            client.DefaultRequestHeaders.Connection.Add("keep-alive");
+            client.DefaultRequestHeaders.Add("Upgrade-Insecure-Requests", "1");
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Dest", "document");
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Mode", "navigate");
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "none");
+            client.DefaultRequestHeaders.Add("Cache-Control", "max-age=0");
+
+            return client;
+        }
+
+        /// <summary>
+        /// Downloads a web page with proper error handling and delays
+        /// </summary>
+        private static async Task<string> DownloadPageAsync(string url)
+        {
+            try
+            {
+                // Add a small delay to be respectful
+                await Task.Delay(Random.Shared.Next(500, 1500));
+                
+                var response = await httpClient.GetAsync(url);
+                
+                if (response.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    ConsoleWriteWithColour($"403 Forbidden received for URL: {url}", ConsoleColor.Red);
+                    ConsoleWriteWithColour("This might indicate anti-bot protection. Consider adding longer delays.", ConsoleColor.Yellow);
+                    throw new HttpRequestException($"403 Forbidden: {url}");
+                }
+                
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadAsStringAsync();
+            }
+            catch (HttpRequestException ex)
+            {
+                ConsoleWriteWithColour($"HTTP Error: {ex.Message}", ConsoleColor.Red);
+                throw;
+            }
+        }
+
         /// <summary>
         /// The entry point for the application.
         /// </summary>
         /// <param name="args">The command-line arguments passed to the application.</param>
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             //DateTime? pastDateTime = new DateTime(2024, 06, 17);
             DateTime? pastDateTime = null;
@@ -24,16 +85,13 @@ namespace SeekNZScraper
 
             DateTime? chosenDate = (pastDateTime != null ? pastDateTime : date);
 
-            
-           
-
             JsonSaveData? saveData;
             List<string> htmlJobPages = new List<string>();
             List<string> urls = new List<string>();
 
             List<Keyword> keywordsToLookOutFor = new Keywords().GetKeywords();
 
-            int pageLimit = 50;
+            int pageLimit = 5;
 
             List<string> roles = new List<string>();
             //To allow backward compatibility
@@ -45,7 +103,6 @@ namespace SeekNZScraper
             {
                 roles = new List<string>() { "developer" };
             }
-            
             
             foreach (string role in roles)
             {
@@ -69,10 +126,9 @@ namespace SeekNZScraper
                 }
                 else
                 {
-                    
                     ConsoleWriteWithColour($"Scraping pages for role: {role}.", ConsoleColor.Blue);
                     // Scrape the website to populate the list
-                    htmlJobPages = ScrapeJobPages(role, pageLimit, out urls);
+                    htmlJobPages = await ScrapeJobPagesAsync(role, pageLimit, urls);
                     ConsoleWriteWithColour("Scraped all job pages from the website.", ConsoleColor.Blue);
 
                     saveData = new JsonSaveData(htmlJobPages, urls);
@@ -87,7 +143,6 @@ namespace SeekNZScraper
                     {
                         Console.WriteLine($"Serialization failed: {ex.Message}");
                     }
-                    
                 }
 
                 if (htmlJobPages != null)
@@ -124,44 +179,48 @@ namespace SeekNZScraper
             }
         }
 
-
         /// <summary>
         /// Scrapes the job pages for a given keyword and page limit.
         /// </summary>
         /// <param name="role">The role to search for in job listings.</param>
         /// <param name="pageLimit">The maximum number of pages to scrape.</param>
-        /// <param name="urls">Out parameter that will contain the URLs of the scraped job pages.</param>
+        /// <param name="urls">List that will contain the URLs of the scraped job pages.</param>
         /// <returns>A list of individual job pages scraped from the website.</returns>
-        private static List<string> ScrapeJobPages(string role, int pageLimit, out List<string> urls)
+        private static async Task<List<string>> ScrapeJobPagesAsync(string role, int pageLimit, List<string> urls)
         {
-
-            //Scraping the Job Query page which holds all the job listings.
-            urls = new List<string>();
             List<string> individualJobPages = new List<string>();
 
-            string domain = "https://seek.co.nz";
+            string domain = "https://www.seek.co.nz";
             string location = "auckland";
             string pageQuery = "?page=";
             
-
             // Load the HTML from the URL
-            string url = $"{domain}/{role}-jobs/in-{location}{pageQuery}";
+            string baseUrl = $"{domain}/{role}-jobs/in-{location}{pageQuery}";
+
+            // First, visit the main domain to get initial cookies
+            try
+            {
+                ConsoleWriteWithColour("Getting initial cookies from main domain...", ConsoleColor.Yellow);
+                await DownloadPageAsync(domain);
+            }
+            catch (Exception ex)
+            {
+                ConsoleWriteWithColour($"Warning: Could not get initial cookies: {ex.Message}", ConsoleColor.Yellow);
+            }
 
             try
             {
-                //Currently guess work as to how many pages.
-                //When there isn't a page available, it will not have an "<article>" but a "<section>" with value of "No matching search results"
                 for (int pageNum = 1; pageNum <= pageLimit; pageNum++)
                 {
                     ConsoleWriteWithColour($"Page: {pageNum}", ConsoleColor.Yellow);
 
-                    WebClient webClient = new WebClient(); //Deprecated
-                                                           //+ page number: https://seek.co.nz/developer-jobs/in-auckland?page=1
-                    string mainHTMLJobQuery = webClient.DownloadString(url + pageNum);
+                    string currentUrl = baseUrl + pageNum;
+                    string mainHTMLJobQuery = await DownloadPageAsync(currentUrl);
 
                     // Parse the HTML using HtmlAgilityPack
                     HtmlDocument doc = new HtmlDocument();
                     doc.LoadHtml(mainHTMLJobQuery);
+                    
                     //Search for articles
                     HtmlNodeCollection? articles = doc.DocumentNode.SelectNodes("//article");
 
@@ -169,10 +228,10 @@ namespace SeekNZScraper
                     if (articles == null)
                     {
                         HtmlNodeCollection sections = doc.DocumentNode.SelectNodes("//section");
-                        if (sections.Count > 0)
+                        if (sections != null && sections.Count > 0)
                         {
                             HtmlNodeCollection h3Nodes = doc.DocumentNode.SelectNodes(".//h3");
-                            if (h3Nodes.Count > 0)
+                            if (h3Nodes != null && h3Nodes.Count > 0)
                             {
                                 foreach (var h3 in h3Nodes)
                                 {
@@ -208,7 +267,6 @@ namespace SeekNZScraper
                             // Find all h3 tags inside the article tag
                             var jobTitles = article.SelectNodes(".//h3");
 
-
                             // If there are any h3 tags, print out their text content
                             if (jobTitles != null)
                             {
@@ -222,15 +280,13 @@ namespace SeekNZScraper
                                     ConsoleWriteWithColour(_jobTitle, ConsoleColor.Cyan);
                                     ConsoleWriteWithColour($"Page Link: {fullJobLink}", ConsoleColor.Green);
 
-                                    WebClient _webClient = new WebClient(); //Deprecated
-                                    string htmlJobPage = webClient.DownloadString(fullJobLink);
+                                    string htmlJobPage = await DownloadPageAsync(fullJobLink);
                                     individualJobPages.Add(htmlJobPage);
                                     urls.Add(fullJobLink);
                                 }
                             }
                         }
                     }
-
                 }
             }
             catch (LoopBreakException)
@@ -451,6 +507,5 @@ namespace SeekNZScraper
             Console.WriteLine(message);
             Console.ResetColor();
         }
-
     }
 }
